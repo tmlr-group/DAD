@@ -30,7 +30,6 @@ The checkpoint of pre-trained classifiers on CIFAR-10 should be put in
 
 - To train ```ResNet``` and ```WideResNet```:
 ```
-# clone repo
 git clone https://github.com/meliketoy/wide-resnet.pytorch.git
 
 # train a WRN-28-10
@@ -49,10 +48,8 @@ python3 main.py --lr 0.1 --net_type 'resnet' --depth 50 --dataset 'cifar10'
 
 - To train a Swin-Transformer: 
 ```
-# clone repo
 git clone https://github.com/kentaroy47/vision-transformers-cifar10.git
 
-# train a Swin-Transformer
 python train_cifar10.py --net swin --n_epochs 400
 ```
 
@@ -60,14 +57,14 @@ python train_cifar10.py --net swin --n_epochs 400
 
 ### Run Experiments
 #### Train DAD on CIFAR-10
+- Generate training data for MMD and denoiser:
 ```
 cd dataset
 
-# generate training data for MMD and denoiser
 python3 cifar10.py
-
-cd ..
-
+```
+- Train DAD:
+```
 # train DAD on WRN-28-10
 python3 train.py --data 'CIFAR10' --model 'wrn28' --batch-size 500 --epochs 60 
 
@@ -77,24 +74,27 @@ python3 train.py --data 'CIFAR10' --model 'rn18' --batch-size 500 --epochs 60
 
 #### Evaluate DAD on CIFAR-10
 ```
+# evaluate DAD on WRN-28-10
 python3 test.py --data 'CIFAR10' --model 'wrn28' --batch-size 100
 
+# evaluate DAD on RN-18
 python3 test.py --data 'CIFAR10' --model 'rn18' --batch-size 100
 ```
 
 #### Train DAD on ImageNet-1K
+- Generate training data for MMD and denoiser:
 ```
 cd dataset
 
-# generate training data for MMD and denoiser
 python3 imagenet.py
+```
+- Generate adversarial data for training MMD and denoiser:
 
-cd ..
-
-# generate adversarial data for training MMD and denoiser
+```
 python3 adv_generator.py  --mode 'train' --data 'ImageNet' --model 'rn50' --attack 'pgd' --epsilon 8/255
-
-# train DAD on RN-50
+```
+- Train DAD:
+```
 python3 train.py --data 'ImageNet' --model 'rn50' --batch-size 128 --epochs 60 
 ```
 
@@ -106,7 +106,9 @@ python3 test.py --data 'ImageNet' --model 'rn50' --batch-size 100
 #### Evaluate DAD against whitebox/adaptive attacks
 ```
 python3 whitebox_attack.py
+
 python3 adaptive_detector_attack.py
+
 python3 adaptive_denoiser_attack.py
 ```
 
