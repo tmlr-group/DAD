@@ -1,0 +1,4 @@
+torch==1.13.0
+torchattacks==3.4.0
+torchvision==0.14.0
+scipy==1.11.2
