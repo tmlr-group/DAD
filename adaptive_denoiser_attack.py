@@ -1,0 +1,216 @@
+from __future__ import print_function
+import os
+import argparse
+import torch
+import torch.backends.cudnn as cudnn
+from torch.utils.data import DataLoader, Subset
+from dataset.cifar10 import CIFAR10
+from models.resnet import RN18_10
+from models.denoise import Denoise,Conv
+from utils import *
+from adv_generator import *
+
+parser = argparse.ArgumentParser(description='PyTorch DAD')
+parser.add_argument('--seed', type=int, default=1, metavar='S',
+                    help='random seed (default: 1)')
+parser.add_argument('--model-dir', default='./checkpoint/CIFAR10/Denoise',
+                    help='directory of model for saving checkpoint')
+parser.add_argument('--mmd-dir', default='./checkpoint/CIFAR10/SAMMD',
+                    help='directory of mmd for saving checkpoint')
+parser.add_argument('--no-cuda', action='store_true', default=False,
+                    help='disables CUDA training')
+parser.add_argument('--model', type=str, default='rn18', choices=['rn18'])
+parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
+parser.add_argument('--batch-size', type=int, default=100, metavar='N',
+                    help='input batch size for training (default: 128)')
+parser.add_argument('--attack',type=str,default='adaptive_pgd',choices=['adaptive_pgd'], help='select attack setting')
+parser.add_argument('--mode', type=str, default='test', help='decide to generate test data or train data')
+args = parser.parse_args()
+
+def adaptive_pgd_denoiser(device,
+                        denoiser,
+                        semantic_model,
+                        clf,
+                        X,
+                        y,
+                        sigma,
+                        sigma0,
+                        ep,
+                        epsilon=8/255,
+                        num_steps=20,
+                        step_size=2/255):
+    
+    X_pgd = Variable(X.data, requires_grad=True)
+    random_noise = torch.FloatTensor(*X_pgd.shape).uniform_(-epsilon, epsilon).to(device)
+    X_pgd = Variable(X_pgd.data + random_noise, requires_grad=True)
+    nat_feature = semantic_model(X)
+
+    std = 0.25
+    mean = 0
+
+    for _ in range(num_steps):
+        opt = torch.optim.SGD([X_pgd], lr=1e-3)
+        opt.zero_grad()
+
+        X_puri = denoiser(X_pgd)
+        puri_feature = semantic_model(X_puri)
+
+        S = torch.cat([nat_feature.cpu(), puri_feature.cpu()], 0).cuda()
+        Sv = S.view(nat_feature.shape[0] + puri_feature.shape[0], -1)
+    
+        S = torch.cat([X.cpu(), X_puri.cpu()], 0).cuda()
+        S_FEA = S.view(X.shape[0] + X_puri.shape[0], -1)
+
+        _, _, mmd_value = SAMMD_WB(Sv, 100, X.shape[0], S_FEA, 
+                                sigma, sigma0, ep, 0.05, device, torch.float)
+        
+        with torch.enable_grad():
+            noise = torch.randn(X_puri.size()) * std + mean
+            noise = noise.to(device)
+            noise = torch.clamp(noise, 0, 1)
+            noisy_data = torch.clamp(X_puri + noise, 0, 1)
+        loss = nn.CrossEntropyLoss()(clf(denoiser(noisy_data)), y)
+        total_loss = loss + 100*mmd_value
+
+        total_loss.backward(retain_graph=True)
+        eta = step_size * X_pgd.grad.data.sign()
+        X_pgd = Variable(X_pgd.data + eta, requires_grad=True)
+        eta = torch.clamp(X_pgd.data - X.data, -epsilon, epsilon)
+        X_pgd = Variable(X.data + eta, requires_grad=True)
+        X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
+    return X_pgd
+
+def adaptive_adv_generate(denoiser, semantic_model, model, sigma, sigma0, ep, test_loader, device):
+    model.eval()
+    adv_dataset = AdvDataset()
+
+    with torch.enable_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            x_adv = adaptive_pgd_denoiser(device, denoiser, semantic_model, model, data, target, sigma, sigma0, ep)
+            adv_dataset.add(x_adv.cpu(), target.cpu())
+            del x_adv, target, data
+            torch.cuda.empty_cache()
+    return adv_dataset
+
+def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigma, sigma0, ep):
+    denoiser.eval()
+    clf.eval()
+    correct = 0
+    
+    std = 0.25
+    mean = 0
+
+    for data, label in test_loader:
+        if nat_data.shape[0] > data.shape[0]:
+            nat_data = nat_data[0:data.shape[0]]
+            
+        data, label = data.to(device), label.to(device)
+
+        nat_feature = semantic_model(nat_data)
+        nat_feature = nat_feature.view(nat_feature.size(0), -1)
+
+        test_feature = semantic_model(data)
+        test_feature = test_feature.view(test_feature.size(0), -1)
+
+        S = torch.cat([nat_feature.cpu(), test_feature.cpu()], 0).cuda()
+        Sv = S.view(nat_feature.shape[0] + test_feature.shape[0], -1)
+        
+        S = torch.cat([nat_data.cpu(), data.cpu()], 0).cuda()
+        S_FEA = S.view(nat_data.shape[0] + test_feature.shape[0], -1)
+
+        _, _, mmd_value = SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
+                                   sigma, sigma0, ep, 0.05, device, torch.float)
+
+        #add Gaussian noise
+        noise = torch.randn(data.size()) * std + mean
+        noise = noise.to(device)
+        noise = torch.clamp(noise, 0, 1)
+        noisy_data = torch.clamp(data + noise, 0, 1)
+
+        if mmd_value <= 0.05:
+            logits_out = clf(data)
+        else:
+            X_puri = denoiser(noisy_data)
+            logits_out = clf(X_puri)
+        
+        pred = logits_out.max(1, keepdim=True)[1]
+        correct += pred.eq(label.view_as(pred)).sum().item()
+
+    print('Test Accuracy: {}/{} ({:.2f}%)'.format(correct,
+        len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
+    return 100. * correct / len(test_loader.dataset)
+
+def main():
+    # settings for CIFAR10
+    setup_seed(1)
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+
+    train_loader = CIFAR10(train_batch_size=args.batch_size).train_data()
+    test_loader = CIFAR10(test_batch_size=args.batch_size).test_data()
+
+    denoiser_dir = './checkpoint/CIFAR10/Denoise'
+    input_size = [32, 32]
+    block = Conv
+    fwd_out = [64, 128, 256, 256, 256]
+    num_fwd = [2, 3, 3, 3, 3]
+    back_out = [64, 128, 256, 256]
+    num_back = [2, 3, 3, 3]
+    denoiser = Denoise(input_size[0], input_size[1], block, 3, fwd_out, num_fwd, back_out, num_back).to(device)
+    denoiser = torch.nn.DataParallel(denoiser)
+
+    checkpoint = torch.load('checkpoint/CIFAR10/RN18/resnet-18.pth')
+
+    semantic_model = RN18_10(semantic=True).to(device)
+    semantic_model = torch.nn.DataParallel(semantic_model)
+    clf = RN18_10(semantic=False).to(device)
+    clf = torch.nn.DataParallel(clf)
+
+    semantic_model.load_state_dict(checkpoint)
+    semantic_model.eval()
+    print('load semantic model successfully!')
+
+    clf.load_state_dict(checkpoint)
+    clf.eval()
+    print('load cls successfully!')
+
+    train_dataset = train_loader.dataset
+
+    # create subsets
+    with open('data/cifar10_mmd_indices.pkl', 'rb') as f:
+        mmd_indices = pickle.load(f)
+    print('load mmd indices successfully!')
+    args.mmd_batch = len(mmd_indices)
+    mmd_subset = Subset(train_dataset, mmd_indices)
+    print('load mmd dataset successfully!')
+    
+    data_only = [mmd_subset[i][0] for i in range(len(mmd_subset))]
+    nat_data = torch.stack(data_only)
+
+    cudnn.benchmark = True
+
+    loaded_parameters = torch.load('{}/rn18_mmd_parameters.pth'.format(args.mmd_dir))
+    ep = loaded_parameters['ep']
+    sigma0 = loaded_parameters['sigma0']
+    sigma = loaded_parameters['sigma']
+
+    # load checkpoints of denoiser
+    denoiser_ckpt = torch.load('{}/CIFAR10_rn18_denoiser_epoch60.pth'.format(denoiser_dir))
+    denoiser.load_state_dict(denoiser_ckpt)
+
+    print('==> Generate adversarial sample')
+    PATH_DATA='./adv_data/CIFAR10/RN18'
+    adaptive_denoiser_adv_dataset = adaptive_adv_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
+    print('==> Save adversarial sample')
+    torch.save(adaptive_denoiser_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.attack}_{args.model}_denoiser.pth'))
+
+    adaptive_denoiser_test_loader = DataLoader(adaptive_denoiser_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
+
+    print('=====================adaptive denoiser PGD-20 Accuracy====================')
+    eval_test(denoiser, clf, device, adaptive_denoiser_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
+
+if __name__ == '__main__':
+    main()
