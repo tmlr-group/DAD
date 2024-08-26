@@ -20,7 +20,7 @@ pip install -r requirements.txt
 ```
 
 ### AutoAttack Implementation and Evaluation
-The implementation and evaluation of AutoAttack used in our paper strictly follows [RobustBench](https://robustbench.github.io/) with the following [GitHub link](https://github.com/RobustBench/robustbench).
+The implementation and evaluation of AutoAttack used in our paper strictly follows [RobustBench](https://robustbench.github.io/) with the following [GitHub](https://github.com/RobustBench/robustbench).
 
 To use AutoAttack, please clone the following repository into our repository:
 
@@ -29,12 +29,12 @@ git clone https://github.com/fra31/auto-attack.git
 ```
 
 ### BPDA+EOT Implementation and Evaluation
-The implementation and evluation of BPDA+EOT strictly follows [the paper](https://arxiv.org/abs/2005.13525) with the following [GitHub link](https://github.com/point0bar1/ebm-defense).
+The implementation and evluation of BPDA+EOT strictly follows [the paper](https://arxiv.org/abs/2005.13525) with the following [GitHub](https://github.com/point0bar1/ebm-defense).
 
 ### Pre-trained Classifiers
 The checkpoint of pre-trained classifiers on CIFAR-10 should be put in 
 ```checkpoint/CIFAR10/[your model name]```. For example, the checkpoint of pre-trained ```WideResNet-28-10``` on CIFAR-10 should be put in ```checkpoint/CIFAR10/WRN28```.
-- The training recipe of ```ResNet``` and ```WideResNet``` on CIFAR-10 follows the [GitHub link](https://github.com/meliketoy/wide-resnet.pytorch). 
+- The training recipe of ```ResNet``` and ```WideResNet``` on CIFAR-10 follows the [GitHub](https://github.com/meliketoy/wide-resnet.pytorch). 
 
 - To train ```ResNet``` and ```WideResNet```:
 ```
@@ -52,7 +52,7 @@ python3 main.py --lr 0.1 --net_type 'resnet' --depth 18 --dataset 'cifar10'
 # train a RN-50
 python3 main.py --lr 0.1 --net_type 'resnet' --depth 50 --dataset 'cifar10'
 ```
-- The training recipe of ```Swin-Transformer``` on CIFAR-10 follows the [GitHub link](https://github.com/kentaroy47/vision-transformers-cifar10).
+- The training recipe of ```Swin-Transformer``` on CIFAR-10 follows the [GitHub](https://github.com/kentaroy47/vision-transformers-cifar10).
 
 - To train a Swin-Transformer: 
 ```
@@ -149,7 +149,7 @@ python3 transfer_attack.py --model 'rn18' --epsilon 12/255
 
 ### License and Contributing
 - This README is formatted based on [the NeurIPS guideline](https://github.com/paperswithcode/releasing-research-code).
-- Feel free to post any issues via Github.
+- Feel free to post any issues via GitHub.
 
 
 
