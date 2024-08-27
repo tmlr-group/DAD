@@ -4,11 +4,14 @@ data/cifar-10-python.tar.gz/
 /checkpoint/
 /autoattack/
 /adv_data/
+/output/
 /__pycache__/
 /dataset/__pycache__/
+/dataset/cifar10.slurm
 /models/__pycache__/
 train.slurm
 test.slurm
 adaptive.slurm
+whitebox.slurm
 adv.slurm
 transfer.slurm

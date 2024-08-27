@@ -7,7 +7,7 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader, Subset
 import torch.nn.functional as F
 from models.resnet import RN18_10
-from models.wide_resnet import WRN28_10
+from models.wide_resnet import WRN28_10, WRN70_16
 from torchvision.models import resnet50
 from models.denoise import Denoise, Conv
 from dataset.utils import *
@@ -42,7 +42,7 @@ parser.add_argument('--save-freq', '-s', default=10, type=int, help='save freque
 parser.add_argument('--test-freq', default=1, type=int, help='test frequency')
 parser.add_argument('--num-workers', type=int, default=2, help='number of workers')
 parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet'])
-parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'rn50', 'rn18'])
+parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'wrn70', 'rn50', 'rn18'])
 parser.add_argument("--n-epochs", type=int, default=200, help="number of epochs for mmd training")
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
 parser.add_argument('--mode', type=str, default='train', help='decide to train a denoiser or test the denoiser')
@@ -208,6 +208,19 @@ def main():
             clf.load_state_dict(checkpoint)
             clf.eval()
             print('load cls successfully!')
+        elif args.model == 'wrn70':
+            semantic_model = RN18_10(semantic=True).to(device)
+            semantic_model = torch.nn.DataParallel(semantic_model)
+            semantic_checkpoint = torch.load('checkpoint/CIFAR10/RN18/resnet-18.pth')
+            semantic_model.load_state_dict(semantic_checkpoint)
+            semantic_model.eval()
+            print('load semantic model successfully!')
+            clf = WRN70_16(semantic=False).to(device)
+            clf = torch.nn.DataParallel(clf)
+            checkpoint = torch.load('checkpoint/CIFAR10/WRN70/wide-resnet-70x16.pth') # download targeted model 
+            clf.load_state_dict(checkpoint)
+            clf.eval()
+            print('load cls successfully!')
         elif args.model == 'rn18':
             checkpoint = torch.load('checkpoint/CIFAR10/RN18/resnet-18.pth')
             semantic_model = RN18_10(semantic=True).to(device)
@@ -271,13 +284,13 @@ def main():
         args.num_steps = 10
 
         if args.model == 'rn50':
-            pgd_trainset = torch.load('adv_data/ImageNet/RN50/train_pgd_{}_rn50.pth'.format(args.epsilon))
-            mmd_pgd_trainset = torch.load('adv_data/ImageNet/RN50/train_pgd_{}_rn50_mmd.pth'.format(args.epsilon))
-            pgd_train_loader = DataLoader(pgd_trainset, 
+            mma_trainset = torch.load('adv_data/ImageNet/RN50/train_pgd_{}_rn50.pth'.format(args.epsilon))
+            mmd_mma_trainset = torch.load('adv_data/ImageNet/RN50/train_pgd_{}_rn50_mmd.pth'.format(args.epsilon))
+            mma_train_loader = DataLoader(mma_trainset, 
                                   batch_size=args.batch_size, 
                                   shuffle=False, 
                                   num_workers=args.num_workers)
-            mmd_pgd_train_loader = DataLoader(mmd_pgd_trainset, 
+            mmd_mma_train_loader = DataLoader(mmd_mma_trainset, 
                                       batch_size=args.mmd_batch, 
                                       shuffle=False, 
                                       num_workers=args.num_workers)
@@ -315,9 +328,9 @@ def main():
         # generating adversarial examples for training
         start_time = time.time()
         print('generating adversarial examples for training')
-        args.attack = 'pgd'
-        pgd_trainset = adv_generate(clf, train_loader, device, args)
-        pgd_train_loader = DataLoader(pgd_trainset, 
+        args.attack = 'mma'
+        mma_trainset = adv_generate(clf, train_loader, device, args)
+        mma_train_loader = DataLoader(mma_trainset, 
                                     batch_size=args.batch_size, 
                                     shuffle=False, 
                                     num_workers=args.num_workers)
@@ -327,8 +340,8 @@ def main():
 
         print('generating adversarial examples for mmd training')
         start_time = time.time()
-        mmd_pgd_trainset = adv_generate(clf, mmd_loader, device, args)
-        mmd_pgd_train_loader = DataLoader(mmd_pgd_trainset, 
+        mmd_mma_trainset = adv_generate(clf, mmd_loader, device, args)
+        mmd_mma_train_loader = DataLoader(mmd_mma_trainset, 
                                         batch_size=args.mmd_batch, 
                                         shuffle=False, 
                                         num_workers=args.num_workers)
@@ -338,7 +351,7 @@ def main():
 
     # train mmd
     print('start training the kernel of mmd')
-    epsilonOPT, sigma0, sigmaOPT = train_mmd(args, mmd_loader, mmd_pgd_train_loader, semantic_model, device)
+    epsilonOPT, sigma0, sigmaOPT = train_mmd(args, mmd_loader, mmd_mma_train_loader, semantic_model, device)
     ep = torch.exp(epsilonOPT) / (1 + torch.exp(epsilonOPT))
     sigma = sigmaOPT ** 2
     print('finish training!')
@@ -354,7 +367,7 @@ def main():
     if not os.path.exists(args.mmd_dir):
         os.makedirs(args.mmd_dir)
 
-    torch.save(mmd_parameters, os.path.join(args.mmd_dir, '{}_mmd_parameters.pth'.format(args.data, args.model)))
+    torch.save(mmd_parameters, os.path.join(args.mmd_dir, '{}_mmd_parameters.pth'.format(args.model)))
     print('Parameters of mmd saved successfully.')
 
     print('start training the denoiser')
@@ -363,7 +376,7 @@ def main():
         adjust_learning_rate(args, optimizer, epoch)
 
         # standardly train denoiser
-        train_denoiser(args, train_loader, pgd_train_loader, 
+        train_denoiser(args, train_loader, mma_train_loader, 
                         optimizer, epoch, denoiser, semantic_model, clf, 
                         ep, sigma0, sigma, device)
 

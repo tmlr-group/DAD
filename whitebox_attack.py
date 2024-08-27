@@ -6,6 +6,7 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader, Subset
 from dataset.cifar10 import CIFAR10
 from models.resnet import RN18_10
+from models.wide_resnet import WRN28_10
 from models.denoise import Denoise,Conv
 from utils import *
 from adv_generator import *
@@ -19,57 +20,90 @@ parser.add_argument('--mmd-dir', default='./checkpoint/CIFAR10/SAMMD',
                     help='directory of mmd for saving checkpoint')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
-parser.add_argument('--model', type=str, default='rn18', choices=['rn18'])
+parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'wrn70'])
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
 parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                     help='input batch size for training (default: 128)')
-parser.add_argument('--attack',type=str,default='pgd',choices=['pgd'], help='select attack setting')
 parser.add_argument('--mode', type=str, default='test', help='decide to generate test data or train data')
 args = parser.parse_args()
 
-def whitebox_pgd(device,
+def whitebox_pgd_eot(device,
                  denoiser,
+                 semantic_model,
                  clf,
                  X,
                  y,
+                 sigma,
+                 sigma0,
+                 ep,
                  epsilon=8/255,
-                 num_steps=20,
+                 num_steps=200,
+                 eot_steps=20,
                  step_size=2/255):
     
-    X_pgd = Variable(X.data, requires_grad=True)
-    random_noise = torch.FloatTensor(*X_pgd.shape).uniform_(-epsilon, epsilon).to(device)
-    X_pgd = Variable(X_pgd.data + random_noise, requires_grad=True)
+    images = X.clone().detach().to(device)
+    labels = y.clone().detach().to(device)
 
-    #add Gaussian noise
+    nat_feature = semantic_model(images)
+
     std = 0.25
     mean = 0
 
+    loss = nn.CrossEntropyLoss()
+
+    adv_images = images.clone().detach()
+    adv_images = adv_images + torch.empty_like(adv_images).uniform_(-epsilon, epsilon)  # nopep8
+    adv_images = torch.clamp(adv_images, min=0, max=1).detach()
+
     for _ in range(num_steps):
-        opt = torch.optim.SGD([X_pgd], lr=1e-3)
-        opt.zero_grad()
+        grad = torch.zeros_like(adv_images)
+        adv_images.requires_grad = True
+        for _ in range(eot_steps):
+            adv_feature = semantic_model(adv_images)
 
-        with torch.enable_grad():
-            noise = torch.randn(X_pgd.size()) * std + mean
-            noise = noise.to(device)
-            noise = torch.clamp(noise, 0, 1)
-            noisy_data = torch.clamp(X_pgd + noise, 0, 1)
-            loss = nn.CrossEntropyLoss()(clf(denoiser(noisy_data)), y)
-        loss.backward()
-        eta = step_size * X_pgd.grad.data.sign()
-        X_pgd = Variable(X_pgd.data + eta, requires_grad=True)
-        eta = torch.clamp(X_pgd.data - X.data, -epsilon, epsilon)
-        X_pgd = Variable(X.data + eta, requires_grad=True)
-        X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
-    return X_pgd
+            S = torch.cat([nat_feature.cpu(), adv_feature.cpu()], 0).cuda()
+            Sv = S.view(nat_feature.shape[0] + adv_feature.shape[0], -1)
+    
+            S = torch.cat([X.cpu(), adv_images.cpu()], 0).cuda()
+            S_FEA = S.view(X.shape[0] + adv_images.shape[0], -1)
 
-def whitebox_pgd_generate(denoiser, model, test_loader, device):
+            _, _, mmd_value = SAMMD_WB(Sv, 100, X.shape[0], S_FEA, 
+                                sigma, sigma0, ep, 0.05, device, torch.float)
+            
+            with torch.enable_grad():
+                noise = torch.randn(adv_images.size()) * std + mean
+                noise = noise.to(device)
+                noise = torch.clamp(noise, 0, 1)
+                noisy_data = torch.clamp(adv_images + noise, 0, 1)
+
+            if mmd_value <= 0.05:
+                outputs = clf(adv_images)
+            else:
+                outputs = clf(denoiser(noisy_data))
+
+            # Calculate loss
+            cost = loss(outputs, labels)
+
+            # Update adversarial images
+            grad += torch.autograd.grad(
+                cost, adv_images, retain_graph=False, create_graph=False
+            )[0]
+
+        # (grad/self.eot_iter).sign() == grad.sign()
+        adv_images = adv_images.detach() + step_size * grad.sign()
+        delta = torch.clamp(adv_images - images, min=-epsilon, max=epsilon)
+        adv_images = torch.clamp(images + delta, min=0, max=1).detach()
+
+    return adv_images
+
+def whitebox_pgd_generate(denoiser, semantic_model, model, sigma, sigma0, ep, test_loader, device):
     model.eval()
     adv_dataset = AdvDataset()
 
     with torch.enable_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            x_adv = whitebox_pgd(device, denoiser, model, data, target)
+            x_adv = whitebox_pgd_eot(device, denoiser, semantic_model, model, data, target, sigma, sigma0, ep)
             adv_dataset.add(x_adv.cpu(), target.cpu())
             del x_adv, target, data
             torch.cuda.empty_cache()
@@ -145,17 +179,16 @@ def main():
     denoiser = torch.nn.DataParallel(denoiser)
 
     checkpoint = torch.load('checkpoint/CIFAR10/RN18/resnet-18.pth')
-
     semantic_model = RN18_10(semantic=True).to(device)
     semantic_model = torch.nn.DataParallel(semantic_model)
-    clf = RN18_10(semantic=False).to(device)
-    clf = torch.nn.DataParallel(clf)
-
     semantic_model.load_state_dict(checkpoint)
     semantic_model.eval()
     print('load semantic model successfully!')
-
-    clf.load_state_dict(checkpoint)
+    
+    clf_checkpoint = torch.load('checkpoint/CIFAR10/WRN28/wide-resnet-28x10.pth')
+    clf = WRN28_10(semantic=False).to(device)
+    clf = torch.nn.DataParallel(clf)
+    clf.load_state_dict(clf_checkpoint)
     clf.eval()
     print('load cls successfully!')
 
@@ -174,24 +207,24 @@ def main():
 
     cudnn.benchmark = True
 
-    loaded_parameters = torch.load('{}/rn18_mmd_parameters.pth'.format(args.mmd_dir))
+    loaded_parameters = torch.load('{}/wrn28_mmd_parameters.pth'.format(args.mmd_dir))
     ep = loaded_parameters['ep']
     sigma0 = loaded_parameters['sigma0']
     sigma = loaded_parameters['sigma']
 
     # load checkpoints of denoiser
-    denoiser_ckpt = torch.load('{}/CIFAR10_rn18_denoiser_epoch60.pth'.format(denoiser_dir))
+    denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60.pth'.format(denoiser_dir))
     denoiser.load_state_dict(denoiser_ckpt)
 
     print('==> Generate adversarial sample')
-    PATH_DATA='./adv_data/CIFAR10/RN18'
-    whitebox_adv_dataset = whitebox_pgd_generate(denoiser, clf, test_loader, device)
+    PATH_DATA='./adv_data/CIFAR10/WRN28'
+    whitebox_adv_dataset = whitebox_pgd_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
     print('==> Save adversarial sample')
-    torch.save(whitebox_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.attack}_{args.model}_whitebox.pth'))
+    torch.save(whitebox_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.model}_PGDEOT_whitebox.pth'))
 
     whitebox_pgd_test_loader = DataLoader(whitebox_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
 
-    print('=====================whitebox PGD-20 Accuracy====================')
+    print('=====================whitebox PGD+EOT Accuracy====================')
     eval_test(denoiser, clf, device, whitebox_pgd_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 
 if __name__ == '__main__':

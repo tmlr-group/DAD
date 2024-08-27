@@ -135,7 +135,7 @@ python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack
 
 python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'eotpgd' --epsilon 12/255
 
-python3 -adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'cw' --num-step 200 --epsilon 1.0
+python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'cw' --num-step 200 --epsilon 1.0
 ```
 
 - Evaluate the performance against transfer attacks:
