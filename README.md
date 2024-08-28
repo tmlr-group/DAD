@@ -7,15 +7,9 @@
 #### Figure 1: The illustration of our method.
 ![pipeline](images/pipeline.jpg)
 
-### Environment Setup
-Please make sure to set up the environment within the cloned repository directiory.
+### Installation
+The code is tested with Python 3.9. To install the requried packages, run:
 ```
-conda create -n [your_env_name] python=3.9
-
-conda activate [your_env_name]
-
-conda install pip
-
 pip install -r requirements.txt
 ```
 
@@ -74,10 +68,10 @@ python3 cifar10.py
 - Train DAD:
 ```
 # train DAD on WRN-28-10
-python3 train.py --data 'CIFAR10' --model 'wrn28' --batch-size 500 --epochs 60 
+python3 train.py --data 'CIFAR10' --model 'wrn28' --epochs 60 
 
 # train DAD on RN-18
-python3 train.py --data 'CIFAR10' --model 'rn18' --batch-size 500 --epochs 60 
+python3 train.py --data 'CIFAR10' --model 'rn18' --epochs 60 
 ```
 
 #### Evaluate DAD on CIFAR-10
@@ -103,7 +97,7 @@ python3 adv_generator.py  --mode 'train' --data 'ImageNet' --model 'rn50' --atta
 ```
 - Train DAD:
 ```
-python3 train.py --data 'ImageNet' --model 'rn50' --batch-size 128 --epochs 60 
+python3 train.py --data 'ImageNet' --model 'rn50' --epochs 60 
 ```
 
 #### Evaluate DAD on ImageNet-1K
@@ -115,9 +109,8 @@ python3 test.py --data 'ImageNet' --model 'rn50' --batch-size 100
 ```
 python3 whitebox_attack.py
 
-python3 adaptive_detector_attack.py
+python3 adaptive_attack.py
 
-python3 adaptive_denoiser_attack.py
 ```
 
 #### Evaluate DAD against transfer attacks
@@ -150,12 +143,3 @@ python3 transfer_attack.py --model 'rn18' --epsilon 12/255
 ### License and Contributing
 - This README is formatted based on [the NeurIPS guideline](https://github.com/paperswithcode/releasing-research-code).
 - Feel free to post any issues via GitHub.
-
-
-
-
-
-
-
-
-

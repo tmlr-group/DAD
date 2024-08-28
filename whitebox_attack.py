@@ -216,9 +216,13 @@ def main():
     denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60.pth'.format(denoiser_dir))
     denoiser.load_state_dict(denoiser_ckpt)
 
-    print('==> Generate adversarial sample')
     PATH_DATA='./adv_data/CIFAR10/WRN28'
+    if not os.path.exists(PATH_DATA):
+        os.makedirs(PATH_DATA)
+
+    print('==> Generate adversarial sample')
     whitebox_adv_dataset = whitebox_pgd_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
+
     print('==> Save adversarial sample')
     torch.save(whitebox_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.model}_PGDEOT_whitebox.pth'))
 
