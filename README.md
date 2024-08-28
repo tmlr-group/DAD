@@ -13,18 +13,6 @@ The code is tested with Python 3.9. To install the requried packages, run:
 pip install -r requirements.txt
 ```
 
-### AutoAttack Implementation and Evaluation
-The implementation and evaluation of AutoAttack used in our paper strictly follows [RobustBench](https://robustbench.github.io/) with the following [GitHub](https://github.com/RobustBench/robustbench).
-
-To use AutoAttack, please clone the following repository into our repository:
-
-```
-git clone https://github.com/fra31/auto-attack.git
-```
-
-### BPDA+EOT Implementation and Evaluation
-The implementation and evluation of BPDA+EOT strictly follows [the paper](https://arxiv.org/abs/2005.13525) with the following [GitHub](https://github.com/point0bar1/ebm-defense).
-
 ### Pre-trained Classifiers
 The checkpoint of pre-trained classifiers on CIFAR-10 should be put in 
 ```checkpoint/CIFAR10/[your model name]```. For example, the checkpoint of pre-trained ```WideResNet-28-10``` on CIFAR-10 should be put in ```checkpoint/CIFAR10/WRN28```.
@@ -139,6 +127,19 @@ python3 transfer_attack.py --model 'rn18' --epsilon 8/255
 
 python3 transfer_attack.py --model 'rn18' --epsilon 12/255
 ```
+
+### AutoAttack Implementation and Evaluation
+The implementation and evaluation of AutoAttack used in our paper strictly follows [RobustBench](https://robustbench.github.io/) with the following [GitHub](https://github.com/RobustBench/robustbench).
+
+To use AutoAttack, please clone the following repository into our repository:
+
+```
+git clone https://github.com/fra31/auto-attack.git
+```
+
+### BPDA+EOT Implementation and Evaluation
+The implementation and evluation of BPDA+EOT strictly follows [the paper](https://arxiv.org/abs/2005.13525) with the following [GitHub](https://github.com/point0bar1/ebm-defense).
+
 
 ### License and Contributing
 - This README is formatted based on [the NeurIPS guideline](https://github.com/paperswithcode/releasing-research-code).
