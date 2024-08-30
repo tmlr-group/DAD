@@ -187,15 +187,36 @@ def main():
     semantic_model.load_state_dict(checkpoint)
     semantic_model.eval()
     print('load semantic model successfully!')
-    
-    clf_checkpoint = torch.load('checkpoint/CIFAR10/WRN28/wide-resnet-28x10.pth')
-    clf = WRN28_10(semantic=False).to(device)
+
+    if args.model == 'wrn28':
+        clf_checkpoint = torch.load('checkpoint/CIFAR10/WRN28/wide-resnet-28x10.pth')
+        clf = WRN28_10(semantic=False).to(device)
+        loaded_parameters = torch.load('{}/wrn28_mmd_parameters.pth'.format(args.mmd_dir))
+        denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60.pth'.format(denoiser_dir))
+        PATH_DATA='./adv_data/CIFAR10/WRN28'
+    elif args.model == 'wrn70':
+        clf_checkpoint = torch.load('checkpoint/CIFAR10/WRN70/wide-resnet-70x16.pth')
+        clf = WRN70_16(semantic=False).to(device)
+        loaded_parameters = torch.load('{}/wrn70_mmd_parameters.pth'.format(args.mmd_dir))
+        denoiser_ckpt = torch.load('{}/CIFAR10_wrn70_denoiser_epoch60.pth'.format(denoiser_dir))
+        PATH_DATA='./adv_data/CIFAR10/WRN70'
+
     clf = torch.nn.DataParallel(clf)
     clf.load_state_dict(clf_checkpoint)
     clf.eval()
     print('load cls successfully!')
 
     train_dataset = train_loader.dataset
+        
+    ep = loaded_parameters['ep']
+    sigma0 = loaded_parameters['sigma0']
+    sigma = loaded_parameters['sigma']
+
+    # load checkpoints of denoiser
+    denoiser.load_state_dict(denoiser_ckpt)
+
+    if not os.path.exists(PATH_DATA):
+        os.makedirs(PATH_DATA)
 
     # create subsets
     with open('data/cifar10_mmd_indices.pkl', 'rb') as f:
@@ -209,19 +230,6 @@ def main():
     nat_data = torch.stack(data_only)
 
     cudnn.benchmark = True
-
-    loaded_parameters = torch.load('{}/wrn28_mmd_parameters.pth'.format(args.mmd_dir))
-    ep = loaded_parameters['ep']
-    sigma0 = loaded_parameters['sigma0']
-    sigma = loaded_parameters['sigma']
-
-    # load checkpoints of denoiser
-    denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60.pth'.format(denoiser_dir))
-    denoiser.load_state_dict(denoiser_ckpt)
-
-    PATH_DATA='./adv_data/CIFAR10/WRN28'
-    if not os.path.exists(PATH_DATA):
-        os.makedirs(PATH_DATA)
     
     print('==> Generate adversarial sample')
     adaptive_adv_dataset = adaptive_pgd_eot_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
