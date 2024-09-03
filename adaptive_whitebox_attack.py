@@ -84,8 +84,6 @@ def adaptive_pgd_eot(device,
             cost = loss(outputs, labels)
             
             total_cost = cost + 100*mmd_value
-            
-            #total_cost = cost - 100*mmd_value
 
             # Update adversarial images
             grad += torch.autograd.grad(
@@ -140,6 +138,7 @@ def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigm
 
         _, _, mmd_value = SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
                                    sigma, sigma0, ep, 0.05, device, torch.float)
+        print('MMD value: {:.4f}'.format(mmd_value))
 
         #add Gaussian noise
         noise = torch.randn(data.size()) * std + mean
@@ -169,7 +168,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
     train_loader = CIFAR10(train_batch_size=args.batch_size).train_data()
-    test_loader = CIFAR10(test_batch_size=args.batch_size).test_data()
+    #test_loader = CIFAR10(test_batch_size=args.batch_size).test_data()
 
     denoiser_dir = './checkpoint/CIFAR10/Denoise'
     input_size = [32, 32]
@@ -231,11 +230,11 @@ def main():
 
     cudnn.benchmark = True
     
-    print('==> Generate adversarial sample')
-    adaptive_adv_dataset = adaptive_pgd_eot_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
-    print('==> Save adversarial sample')
-    torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.model}_PGDEOT_adaptive.pth'))
-
+    # print('==> Generate adversarial sample')
+    # adaptive_adv_dataset = adaptive_pgd_eot_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
+    # print('==> Save adversarial sample')
+    # torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.model}_PGDEOT_adaptive.pth'))
+    adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_{args.model}_PGDEOT_adaptive.pth'))
     adaptive_test_loader = DataLoader(adaptive_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
 
     print('=====================Adaptive PGDEOT Accuracy====================')

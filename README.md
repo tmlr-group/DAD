@@ -58,8 +58,8 @@ python3 cifar10.py
 # train DAD on WRN-28-10
 python3 train.py --data 'CIFAR10' --model 'wrn28' --epochs 60 
 
-# train DAD on RN-18
-python3 train.py --data 'CIFAR10' --model 'rn18' --epochs 60 
+# train DAD on WRN-70-16
+python3 train.py --data 'CIFAR10' --model 'wrn70' --epochs 60 
 ```
 
 #### Evaluate DAD on CIFAR-10
@@ -67,8 +67,8 @@ python3 train.py --data 'CIFAR10' --model 'rn18' --epochs 60
 # evaluate DAD on WRN-28-10
 python3 test.py --data 'CIFAR10' --model 'wrn28' --batch-size 100
 
-# evaluate DAD on RN-18
-python3 test.py --data 'CIFAR10' --model 'rn18' --batch-size 100
+# evaluate DAD on WRN-70-16
+python3 test.py --data 'CIFAR10' --model 'wrn70' --batch-size 100
 ```
 
 #### Train DAD on ImageNet-1K
@@ -81,7 +81,7 @@ python3 imagenet.py
 - Generate adversarial data for training MMD and denoiser:
 
 ```
-python3 adv_generator.py  --mode 'train' --data 'ImageNet' --model 'rn50' --attack 'pgd' --epsilon 8/255
+python3 adv_generator.py  --mode 'train' --data 'ImageNet' --model 'rn50' --attack 'mma'
 ```
 - Train DAD:
 ```
@@ -126,15 +126,6 @@ python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack
 python3 transfer_attack.py --model 'rn18' --epsilon 8/255
 
 python3 transfer_attack.py --model 'rn18' --epsilon 12/255
-```
-
-### AutoAttack Implementation and Evaluation
-The implementation and evaluation of AutoAttack used in our paper strictly follows [RobustBench](https://robustbench.github.io/) with the following [GitHub](https://github.com/RobustBench/robustbench).
-
-To use AutoAttack, please clone the following repository into our repository:
-
-```
-git clone https://github.com/fra31/auto-attack.git
 ```
 
 ### BPDA+EOT Implementation and Evaluation

@@ -8,6 +8,7 @@ data/cifar-10-python.tar.gz/
 /__pycache__/
 /dataset/__pycache__/
 /dataset/cifar10.slurm
+/dataset/imagenet.slurm
 /models/__pycache__/
 train.slurm
 test.slurm
@@ -15,3 +16,5 @@ adaptive.slurm
 whitebox.slurm
 adv.slurm
 transfer.slurm
+train_at.py
+train_at.slurm

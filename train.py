@@ -46,7 +46,7 @@ parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'wrn
 parser.add_argument("--n-epochs", type=int, default=200, help="number of epochs for mmd training")
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
 parser.add_argument('--mode', type=str, default='train', help='decide to train a denoiser or test the denoiser')
-parser.add_argument('--attack', type=str, default='pgd', help='select attack setting')
+parser.add_argument('--attack', type=str, default='mma', help='select attack setting')
 
 args = parser.parse_args()
 
@@ -381,15 +381,16 @@ def main():
                         ep, sigma0, sigma, device)
 
         args.save_freq = 60
+        index = 3
         # save checkpoint
         if epoch % args.save_freq == 0:
             if args.data == 'CIFAR10':
                 torch.save(denoiser.state_dict(),
-                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}.pth'.format(args.data, args.model, epoch)))
+                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, index)))
                 print('save the denoiser')
             if args.data == 'ImageNet':
                 torch.save(denoiser.state_dict(),
-                os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}.pth'.format(args.data, args.model, epoch)))
+                os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, index)))
                 print('save the denoiser')
         print('================================================================')
 

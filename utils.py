@@ -4,8 +4,8 @@ import numpy as np
 import random
 from torch.autograd import Variable
 from scipy import signal
-from torchattacks import PGD, CW, EOTPGD
-from autoattack import AutoAttack
+from torchattacks import PGD, CW, EOTPGD, AutoAttack
+# from autoattack.autoattack import AutoAttack
 from torch.utils.data import Dataset
 
 def parse_fraction(fraction_string):
@@ -193,21 +193,19 @@ def craft_adversarial_example(model,
                      random_start=True)
         x_adv = attack(x_natural, y)
     elif mode == 'aa_l2':
-        adversary = AutoAttack(model, 
+        attack = AutoAttack(model, 
                             norm='L2', 
                             eps=0.5, 
-                            version='standard')
-        x_adv = adversary.run_standard_evaluation(x_natural, 
-                                                  y, 
-                                                  bs=x_natural.shape[0])
+                            version='standard',
+                            n_classes = num_classes)
+        x_adv = attack(x_natural, y)
     elif mode == 'aa':
-        adversary = AutoAttack(model, 
+        attack = AutoAttack(model, 
                             norm='Linf', 
                             eps=8/255, 
-                            version='standard')
-        x_adv = adversary.run_standard_evaluation(x_natural, 
-                                                  y, 
-                                                  bs=x_natural.shape[0])
+                            version='standard',
+                            n_classes=num_classes)
+        x_adv = attack(x_natural, y)
     elif mode == 'eotpgd':
         attack = EOTPGD(model,
                         eps=epsilon,
