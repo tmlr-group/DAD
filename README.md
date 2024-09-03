@@ -93,12 +93,9 @@ python3 train.py --data 'ImageNet' --model 'rn50' --epochs 60
 python3 test.py --data 'ImageNet' --model 'rn50' --batch-size 100
 ```
 
-#### Evaluate DAD against whitebox/adaptive attacks
+#### Evaluate DAD against adaptive whitebox attacks
 ```
-python3 whitebox_attack.py
-
-python3 adaptive_attack.py
-
+python3 adaptive_whitebox_attack.py
 ```
 
 #### Evaluate DAD against transfer attacks
@@ -129,7 +126,7 @@ python3 transfer_attack.py --model 'rn18' --epsilon 12/255
 ```
 
 ### BPDA+EOT Implementation and Evaluation
-The implementation and evluation of BPDA+EOT strictly follows [the paper](https://arxiv.org/abs/2005.13525) with the following [GitHub](https://github.com/point0bar1/ebm-defense).
+The implementation and evaluation of BPDA+EOT strictly follows [the paper](https://arxiv.org/abs/2005.13525) with the following [GitHub](https://github.com/point0bar1/ebm-defense).
 
 
 ### License and Contributing
