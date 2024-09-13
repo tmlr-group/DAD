@@ -196,14 +196,14 @@ def craft_adversarial_example(model,
         attack = AutoAttack(model, 
                             norm='L2', 
                             eps=0.5, 
-                            version='standard',
+                            version='rand',
                             n_classes = num_classes)
         x_adv = attack(x_natural, y)
     elif mode == 'aa':
         attack = AutoAttack(model, 
                             norm='Linf', 
                             eps=8/255, 
-                            version='standard',
+                            version='rand',
                             n_classes=num_classes)
         x_adv = attack(x_natural, y)
     elif mode == 'eotpgd':

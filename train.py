@@ -47,7 +47,7 @@ parser.add_argument("--n-epochs", type=int, default=200, help="number of epochs 
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
 parser.add_argument('--mode', type=str, default='train', help='decide to train a denoiser or test the denoiser')
 parser.add_argument('--attack', type=str, default='mma', help='select attack setting')
-
+parser.add_argument('--index', type=int, default=1, help='index of the model')
 args = parser.parse_args()
 
 def train_mmd(args, train_loader, ae_train_loader, semantic_model, device):
@@ -284,8 +284,8 @@ def main():
         args.num_steps = 10
 
         if args.model == 'rn50':
-            mma_trainset = torch.load('adv_data/ImageNet/RN50/train_pgd_{}_rn50.pth'.format(args.epsilon))
-            mmd_mma_trainset = torch.load('adv_data/ImageNet/RN50/train_pgd_{}_rn50_mmd.pth'.format(args.epsilon))
+            mma_trainset = torch.load('adv_data/ImageNet/RN50/train_mma_{}_rn50.pth'.format(args.epsilon))
+            mmd_mma_trainset = torch.load('adv_data/ImageNet/RN50/train_mma_{}_rn50_mmd.pth'.format(args.epsilon))
             mma_train_loader = DataLoader(mma_trainset, 
                                   batch_size=args.batch_size, 
                                   shuffle=False, 
@@ -381,16 +381,15 @@ def main():
                         ep, sigma0, sigma, device)
 
         args.save_freq = 60
-        index = 3
         # save checkpoint
         if epoch % args.save_freq == 0:
             if args.data == 'CIFAR10':
                 torch.save(denoiser.state_dict(),
-                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, index)))
+                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, args.index)))
                 print('save the denoiser')
             if args.data == 'ImageNet':
                 torch.save(denoiser.state_dict(),
-                os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, index)))
+                os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, args.index)))
                 print('save the denoiser')
         print('================================================================')
 
