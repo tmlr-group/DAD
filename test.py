@@ -14,11 +14,13 @@ parser.add_argument('--mmd-dir', default='./checkpoint/CIFAR10/SAMMD',
                     help='directory of mmd for saving checkpoint')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
-parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'rn18', 'rn50'])
+parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'wrn70', 'rn50'])
 parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                     help='input batch size for training (default: 128)')
 parser.add_argument('--epsilon', default=8/255, type=parse_fraction, help='perturbation')
 parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet'])
+parser.add_argument('--index', type=int, default=1, help='index of the model')
+parser.add_argument('--white-box', action='store_true', default=False, help='white-box attack or non-white-box attack')
 args = parser.parse_args()
 
 def eval_test(clf, semantic_model, denoiser, device, test_loader, nat_data, ep, sigma0, sigma):
@@ -46,7 +48,7 @@ def eval_test(clf, semantic_model, denoiser, device, test_loader, nat_data, ep, 
         S = torch.cat([nat_data.cpu(), data.cpu()], 0).cuda()
         S_FEA = S.view(nat_data.shape[0] + test_feature.shape[0], -1)
 
-        h1, _, _ = SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
+        _, _, mmd_value = SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
                                    sigma, sigma0, ep, 0.05, device, torch.float)
 
         #add Gaussian noise
@@ -55,7 +57,7 @@ def eval_test(clf, semantic_model, denoiser, device, test_loader, nat_data, ep, 
         noise = torch.clamp(noise, 0, 1)
         noisy_data = torch.clamp(data + noise, 0, 1)
 
-        if h1 == 0:
+        if mmd_value < 0.05:
             logits_out = clf(data)
         else:
             X_puri = denoiser(noisy_data)
@@ -109,24 +111,30 @@ def main():
             ep = loaded_parameters['ep']
             sigma0 = loaded_parameters['sigma0']
             sigma = loaded_parameters['sigma']
-        if args.model == 'rn18':
-            checkpoint = torch.load('checkpoint/CIFAR10/RN18/resnet-18.pth')
+
+            adv_dir = './adv_data/CIFAR10/WRN28'
+
+        if args.model == 'wrn70':
+            semantic_checkpoint = torch.load('checkpoint/CIFAR10/RN18/resnet-18.pth')
             semantic_model = RN18_10(semantic=True).to(device)
             semantic_model = torch.nn.DataParallel(semantic_model)
-            semantic_model.load_state_dict(checkpoint)
+            semantic_model.load_state_dict(semantic_checkpoint)
             semantic_model.eval()
             print('load semantic model successfully!')
 
-            clf = RN18_10(semantic=False).to(device)
+            checkpoint = torch.load('checkpoint/CIFAR10/WRN70/wide-resnet-70x16.pth')
+            clf = WRN70_16(semantic=False).to(device)
             clf = torch.nn.DataParallel(clf)
             clf.load_state_dict(checkpoint)
             clf.eval()
             print('load cls successfully!')
 
-            loaded_parameters = torch.load('{}/rn18_mmd_parameters.pth'.format(args.mmd_dir))
+            loaded_parameters = torch.load('{}/wrn70_mmd_parameters.pth'.format(args.mmd_dir))
             ep = loaded_parameters['ep']
             sigma0 = loaded_parameters['sigma0']
             sigma = loaded_parameters['sigma']
+
+            adv_dir = './adv_data/CIFAR10/WRN70'
 
         train_dataset = train_loader.dataset
 
@@ -141,8 +149,9 @@ def main():
 
         cudnn.benchmark = True
 
-        denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60.pth'.format(denoiser_dir))
+        denoiser_ckpt = torch.load('{}/CIFAR10_{}_denoiser_epoch60_{}.pth'.format(denoiser_dir, args.model, args.index))
         denoiser.load_state_dict(denoiser_ckpt)
+
     if args.data == 'ImageNet':
         with open('data/imagenet_mmd_indices.pkl', 'rb') as f:
             mmd_indices = pickle.load(f)
@@ -169,7 +178,7 @@ def main():
         num_back = [2, 3, 3, 3]
         denoiser = Denoise(input_size[0], input_size[1], block, 3, fwd_out, num_fwd, back_out, num_back).to(device)
         denoiser = torch.nn.DataParallel(denoiser)
-        denoiser_ckpt = torch.load('{}/ImageNet_denoiser_epoch60.pth'.format(denoiser_dir))
+        denoiser_ckpt = torch.load('{}/ImageNet_{}_denoiser_epoch60_{}.pth'.format(denoiser_dir, args.model, args.index))
         denoiser.load_state_dict(denoiser_ckpt)
 
         if args.model == 'rn50':
@@ -191,6 +200,14 @@ def main():
 
     print('=====================Natural Accuracy===================')
     eval_test(clf, semantic_model, denoiser, device, test_loader, nat_data, ep, sigma0, sigma)
+    print('=====================Whitebox Robust Accuracy on AutoAttack L_inf===================')
+    aa_testset = torch.load('{}/test_{}_aa_{}_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model, args.index))
+    aa_test_loader = DataLoader(aa_testset, batch_size=args.batch_size, shuffle=False)
+    eval_test(clf, semantic_model, denoiser, device, aa_test_loader, nat_data, ep, sigma0, sigma)
+    print('=====================Whitebox Robust Accuracy on AutoAttack L_2===================')
+    aa_testset = torch.load('{}/test_{}_aa_l2_{}_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model, args.index))
+    aa_test_loader = DataLoader(aa_testset, batch_size=args.batch_size, shuffle=False)
+    eval_test(clf, semantic_model, denoiser, device, aa_test_loader, nat_data, ep, sigma0, sigma)
 
 if __name__ == '__main__':
     main()

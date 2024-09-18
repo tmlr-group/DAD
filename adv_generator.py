@@ -36,9 +36,11 @@ parser.add_argument('--num-class', default=10, help='number of classes')
 parser.add_argument('--step-size', default=2/255, type=parse_fraction, help='perturb step size')
 parser.add_argument('--index', default=1, type=int, help='index of model')
 parser.add_argument('--white-box', action='store_true', default=False, help='white-box attack or non-white-box attack')
+parser.add_argument('--generate', action='store_true', default=False, help='generate adv or not')
+parser.add_argument('--norm', type=str, default='l_inf', help='l_norm', choices=['l_inf', 'l_2'])
 args = parser.parse_args()
 
-class Whitebox_Model(nn.Module):
+class Adaptive_Whitebox_Model(nn.Module):
     def __init__(self, index, device, args):
         super().__init__()
         self.args = args
@@ -51,7 +53,7 @@ class Whitebox_Model(nn.Module):
             model = RN18_10(semantic=False).to(device)
             model_path = './checkpoint/CIFAR10/RN18/resnet-18.pth'
             ckpt = torch.load(model_path)
-            model = torch.nn.DataParallel(model)
+            self.model = torch.nn.DataParallel(model)
             model.load_state_dict(ckpt)
         if args.model == 'wrn28':
             model = WRN28_10(semantic=False).to(device)
@@ -60,7 +62,7 @@ class Whitebox_Model(nn.Module):
             model = torch.nn.DataParallel(model)
             model.load_state_dict(ckpt)
         if args.model == 'wrn70':
-            model = WRN70_16(semantic=False).to(device)
+            self.model = WRN70_16(semantic=False).to(device)
             model_path = './checkpoint/CIFAR10/WRN70/wide-resnet-70x16.pth'
             ckpt = torch.load(model_path)
             model = torch.nn.DataParallel(model)
@@ -214,7 +216,7 @@ def main():
 
     print('==> Load Model')
     if args.white_box:
-        model = Whitebox_Model(args.index, device, args)
+        model = Adaptive_Whitebox_Model(args.index, device, args)
     model.eval()
 
     print('==> Generate adversarial sample')
