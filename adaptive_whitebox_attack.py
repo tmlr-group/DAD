@@ -18,10 +18,16 @@ def adaptive_pgd_eot_l_inf(device,
                  sigma,
                  sigma0,
                  ep,
-                 epsilon=args.epsilon,
-                 num_steps=args.num_steps,
-                 eot_steps=20,
-                 step_size=args.step_size):
+                 args):
+    
+    epsilon = args.epsilon
+    num_steps = args.num_steps
+    step_size = args.step_size
+    eot_steps = 20
+    print('epsilon: ', epsilon)
+    print('num_steps: ', num_steps)
+    print('eot_steps: ', eot_steps)
+    print('step_size: ', step_size)
     
     images = X.clone().detach().to(device)
     labels = y.clone().detach().to(device)
@@ -90,10 +96,16 @@ def adaptive_pgd_eot_l2(device,
                  sigma,
                  sigma0,
                  ep,
-                 epsilon=args.epsilon,
-                 num_steps=args.num_steps,
-                 eot_steps=20,
-                 step_size=args.step_size):
+                 args):
+    
+    epsilon = args.epsilon
+    num_steps = args.num_steps
+    step_size = args.step_size
+    eot_steps = 20
+    print('epsilon: ', epsilon)
+    print('num_steps: ', num_steps)
+    print('eot_steps: ', eot_steps)
+    print('step_size: ', step_size)
     
     images = X.clone().detach().to(device)
     labels = y.clone().detach().to(device)
@@ -188,9 +200,9 @@ def adaptive_pgd_eot_generate(denoiser, semantic_model, model, sigma, sigma0, ep
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             if args.norm == 'l_inf':
-                x_adv = adaptive_pgd_eot_l_inf(device, denoiser, semantic_model, model, data, target, sigma, sigma0, ep)
+                x_adv = adaptive_pgd_eot_l_inf(device, denoiser, semantic_model, model, data, target, sigma, sigma0, ep, args)
             if args.norm == 'l_2':
-                x_adv = adaptive_pgd_eot_l2(device, denoiser, semantic_model, model, data, target, sigma, sigma0, ep)
+                x_adv = adaptive_pgd_eot_l2(device, denoiser, semantic_model, model, data, target, sigma, sigma0, ep, args)
             adv_dataset.add(x_adv.cpu(), target.cpu())
             del x_adv, target, data
             torch.cuda.empty_cache()
