@@ -105,9 +105,6 @@ def main():
     elif args.epsilon == 12/255:
         cw_epsilon = 1.0
 
-    mma_testset = torch.load('{}/test_mma_{}_{}.pth'.format(adv_dir, args.epsilon, args.model))
-    mma_test_loader = DataLoader(mma_testset, batch_size=args.batch_size, shuffle=False)
-
     eotpgd_testset = torch.load('{}/test_eotpgd_{}_{}.pth'.format(adv_dir, args.epsilon, args.model))
     eotpgd_test_loader = DataLoader(eotpgd_testset, batch_size=args.batch_size, shuffle=False)
 
@@ -161,8 +158,6 @@ def main():
     sigma = loaded_parameters['sigma']
 
     print("Current model is: ", args.model)
-    print('====================MMA Results===========================')
-    eval_test(denoiser, clf, device, mma_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
     print('====================EOTPGD Results===========================')
     eval_test(denoiser, clf, device, eotpgd_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
     print('====================CW Results===========================')

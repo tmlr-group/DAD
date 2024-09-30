@@ -236,7 +236,6 @@ def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigm
 
         _, _, mmd_value = SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
                                    sigma, sigma0, ep, 0.05, device, torch.float)
-        print('MMD value: {:.4f}'.format(mmd_value))
 
         #add Gaussian noise
         noise = torch.randn(data.size()) * std + mean
@@ -336,7 +335,7 @@ def main():
         nat_data = nat_data[0:args.batch_size]
         print('the length of nat data is: ', len(nat_data))
 
-        test_loader = ImageNet(test_batch_size=100, num_workers=3).test_data()
+        test_loader = ImageNet(test_batch_size=args.batch_size, num_workers=3).test_data()
 
         denoiser_dir = './checkpoint/ImageNet/Denoise'
         input_size = [224, 224]
@@ -377,15 +376,18 @@ def main():
         print('==> Generate adversarial sample')
         adaptive_adv_dataset = adaptive_pgd_eot_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
         print('==> Save adversarial sample')
-        torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.norm}_{args.model}_PGDEOT_adaptive_{args.index}.pth'))
+        torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.norm}_{args.model}_PGDEOT_adaptive.pth'))
+
+    print('=====================Natural Accuracy===================')
+    eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 
     print('=====================Adaptive PGDEOT L_inf Accuracy====================')
-    l_inf_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_inf_{args.model}_PGDEOT_adaptive_{args.index}.pth'))
-    l_inf_adaptive_test_loader = DataLoader(l_inf_adaptive_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
+    l_inf_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_inf_{args.model}_PGDEOT_adaptive.pth'))
+    l_inf_adaptive_test_loader = DataLoader(l_inf_adaptive_adv_dataset, batch_size=args.batch_size, shuffle=False)
     eval_test(denoiser, clf, device, l_inf_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 
     print('=====================Adaptive PGDEOT L_2 Accuracy====================')
-    l_2_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_2_{args.model}_PGDEOT_adaptive_{args.index}.pth'))
+    l_2_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_2_{args.model}_PGDEOT_adaptive.pth'))
     l_2_adaptive_test_loader = DataLoader(l_2_adaptive_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
     eval_test(denoiser, clf, device, l_2_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 

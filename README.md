@@ -1,8 +1,8 @@
-# Code implementations for ICLR 2025 submission
-## Distributional Discrepancy Minimization Can Help Adversarial Classification
+# Code implementations for ICLR 2025 submission #13588
+## DDAD: A Two-pronged Adversarial Defense Based on Distributional Discrepancy
 
  #### Abstract
- Statistical adversarial data detection (SADD) identifies whether an upcoming batch contains adversarial examples (AEs). Given the distributional discrepancies between natural examples (NEs) and AEs, SADD offers statistical guarantees against adversarial attacks. However, an undeniable problem of SADD-based methods is that they discard entire data batches that contain AEs, leading to poor model deployment during testing time. In this paper, to solve this problem, we propose a new statistical adversarial defence method, named Distributional-Discrepancy-based Adversarial Defense (DAD). In the training phase, DAD first optimizes the test power of the maximum mean discrepancy (MMD) to derive MMD-OPT and then trains a denoiser by minimizing the MMD-OPT between NEs and AEs. In the testing phase, DAD uses MMD-OPT to detect AEs and then denoises them instead of discarding them. Theoretically, we justify that narrowing the distributional discrepancy can help reduce the upper bound of risk on AEs. Empirically, DAD will not discard data compared to detection-based defense methods and outperforms current state-of-the-art adversarial training (AT) and adversarial purification (AP) methods by notably improving natural and robust accuracy simultaneously on CIFAR-10 and ImageNet-1K against various adversarial attacks, including adaptive attacks, which pioneers a new road for statistical adversarial defense methods.
+Statistical adversarial data detection (SADD) detects whether an upcoming batch contains adversarial examples (AEs) by measuring the distributional discrepancies between clean examples (CEs) and AEs. In this paper, we reveal the potential strength of SADD-based methods by theoretically showing that minimizing distributional discrepancy can help reduce the expected loss on AEs. Nevertheless, despite these advantages, SADD-based methods have a potential limitation: they discard inputs detected as AEs, leading to the loss of clean information within those inputs. To address this limitation, we propose a two-pronged adversarial defense method, named Distributional-Discrepancy-based Adversarial Defense (DDAD). In the training phase, DDAD first optimizes the test power of the maximum mean discrepancy (MMD) to derive MMD-OPT, and then trains a denoiser by minimizing the MMD-OPT between CEs and AEs. In the inference phase, DDAD first leverages MMD-OPT to differentiate CEs and AEs, and then applies a two-pronged process: (1) directly feeding the detected CEs into the classifier, and (2) removing noise from the detected AEs by the distributional-discrepancy-based denoiser. Extensive experiments show that DDAD outperforms current state-of-the-art (SOTA) defense methods by notably improving clean and robust accuracy on CIFAR-10 and ImageNet-1K against adaptive white-box attacks.
 
 #### Figure 1: The illustration of our method.
 ![pipeline](images/pipeline.jpg)
@@ -46,70 +46,52 @@ python train_cifar10.py --net swin --n_epochs 400
 - The pre-trained ```ResNet-50``` on ImageNet-1K follows [the Pytorch implmentation](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html) with ```ResNet50_Weights.IMAGENET1K_V2```.
 
 ### Run Experiments
-#### Train DAD on CIFAR-10
+#### Train DDAD on CIFAR-10
 - Generate training data for MMD and denoiser:
 ```
 cd dataset
 
 python3 cifar10.py
 ```
-- Train DAD:
+- Train DDAD:
 ```
-# train DAD on WRN-28-10
+# train DDAD on WRN-28-10
 python3 train.py --data 'CIFAR10' --model 'wrn28' --epochs 60 
 
-# train DAD on WRN-70-16
+# train DDAD on WRN-70-16
 python3 train.py --data 'CIFAR10' --model 'wrn70' --epochs 60 
 ```
 
-#### Evaluate DAD on CIFAR-10
-```
-# evaluate DAD on WRN-28-10
-python3 test.py --data 'CIFAR10' --model 'wrn28' --batch-size 100
-
-# evaluate DAD on WRN-70-16
-python3 test.py --data 'CIFAR10' --model 'wrn70' --batch-size 100
-```
-
-#### Train DAD on ImageNet-1K
+#### Train DDAD on ImageNet-1K
 - Generate training data for MMD and denoiser:
 ```
 cd dataset
 
 python3 imagenet.py
 ```
-- Generate adversarial data for training MMD and denoiser:
+- Generate adversarial data for training MMD-OPT and denoiser:
 
 ```
 python3 adv_generator.py  --mode 'train' --data 'ImageNet' --model 'rn50' --attack 'mma'
 ```
-- Train DAD:
+- Train DDAD:
 ```
 python3 train.py --data 'ImageNet' --model 'rn50' --epochs 60 
 ```
 
-#### Evaluate DAD on ImageNet-1K
-```
-python3 test.py --data 'ImageNet' --model 'rn50' --batch-size 100
-```
-
-#### Evaluate DAD against adaptive whitebox attacks
+#### Evaluate DDAD against adaptive PGD+EOT whitebox attacks
 ```
 python3 adaptive_whitebox_attack.py
 ```
 
-#### Evaluate DAD against transfer attacks
+#### Evaluate DDAD against transfer attacks
 - Generate transfer attacks:
 ```
 # Take RN18 as an example
 
-python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'mma' --epsilon 8/255
-
 python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'eotpgd' --epsilon 8/255
 
 python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'cw' --num-step 200 --epsilon 0.5
-
-python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'mma' --epsilon 12/255
 
 python3 adv_generator.py  --mode 'test' --data 'CIFAR10' --model 'rn18' --attack 'eotpgd' --epsilon 12/255
 

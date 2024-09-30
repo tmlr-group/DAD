@@ -201,11 +201,11 @@ def main():
     print('=====================Natural Accuracy===================')
     eval_test(clf, semantic_model, denoiser, device, test_loader, nat_data, ep, sigma0, sigma)
     print('=====================Whitebox Robust Accuracy on AutoAttack L_inf===================')
-    aa_testset = torch.load('{}/test_{}_aa_{}_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model, args.index))
+    aa_testset = torch.load('{}/test_{}_aa_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model))
     aa_test_loader = DataLoader(aa_testset, batch_size=args.batch_size, shuffle=False)
     eval_test(clf, semantic_model, denoiser, device, aa_test_loader, nat_data, ep, sigma0, sigma)
     print('=====================Whitebox Robust Accuracy on AutoAttack L_2===================')
-    aa_testset = torch.load('{}/test_{}_aa_l2_{}_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model, args.index))
+    aa_testset = torch.load('{}/test_{}_aa_l2_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model))
     aa_test_loader = DataLoader(aa_testset, batch_size=args.batch_size, shuffle=False)
     eval_test(clf, semantic_model, denoiser, device, aa_test_loader, nat_data, ep, sigma0, sigma)
 
