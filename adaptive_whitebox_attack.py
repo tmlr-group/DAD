@@ -317,7 +317,7 @@ def main():
         print('load cls successfully!')
     if args.data == "ImageNet":
         args.num_class = 1000
-        train_dataset = ImageFolder(root='/data/gpfs/datasets/Imagenet/ILSVRC/Data/CLS-LOC/train', 
+        train_dataset = ImageFolder(root='Imagenet/ILSVRC/Data/CLS-LOC/train', 
                                     transform=transforms.Compose([
                                         transforms.RandomResizedCrop(224),
                                         transforms.RandomHorizontalFlip(p=0.5),

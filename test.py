@@ -157,7 +157,7 @@ def main():
             mmd_indices = pickle.load(f)
         print('load mmd indices successfully!')
 
-        train_dataset = ImageFolder(root='/data/gpfs/datasets/Imagenet/ILSVRC/Data/CLS-LOC/train', 
+        train_dataset = ImageFolder(root='Imagenet/ILSVRC/Data/CLS-LOC/train', 
                                         transform=transforms.Compose([
                                             transforms.RandomResizedCrop(224),
                                             transforms.RandomHorizontalFlip(p=0.5),
