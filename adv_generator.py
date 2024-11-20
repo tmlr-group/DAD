@@ -3,6 +3,7 @@ import os
 import torch
 from dataset.cifar10 import CIFAR10
 from dataset.imagenet import ImageNet
+from dataset.svhn import SVHN
 import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Subset
@@ -27,7 +28,7 @@ parser.add_argument('--model', type=str, default='wrn28', choices=['rn18', 'wrn2
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
 parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                     help='input batch size for training (default: 128)')
-parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet'])
+parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet', 'SVHN'])
 parser.add_argument('--attack',type=str,default='mma',help='select attack setting')
 parser.add_argument('--mode', type=str, default='test', help='decide to generate test data or train data')
 parser.add_argument('--epsilon', default=8/255, type=parse_fraction, help='perturbation')
@@ -38,6 +39,7 @@ parser.add_argument('--index', default=1, type=int, help='index of model')
 parser.add_argument('--white-box', action='store_true', default=False, help='white-box attack or non-white-box attack')
 parser.add_argument('--generate', action='store_true', default=False, help='generate adv or not')
 parser.add_argument('--norm', type=str, default='l_inf', help='l_norm', choices=['l_inf', 'l_2'])
+parser.add_argument('--threshold', type=float, default=0.05, help='threshold for detecting AEs')
 args = parser.parse_args()
 
 class Adaptive_Whitebox_Model(nn.Module):

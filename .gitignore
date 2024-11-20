@@ -9,6 +9,7 @@ data/cifar-10-python.tar.gz/
 /dataset/__pycache__/
 /dataset/cifar10.slurm
 /dataset/imagenet.slurm
+/dataset/svhn.slurm
 /models/__pycache__/
 train.slurm
 test.slurm

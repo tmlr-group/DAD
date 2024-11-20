@@ -30,7 +30,7 @@ class ImageNet():
     
     def train_data(self):
         torch.manual_seed(self.seed)
-        train_dataset = ImageFolder(root='Imagenet/ILSVRC/Data/CLS-LOC/train', 
+        train_dataset = ImageFolder(root='/data/gpfs/datasets/Imagenet/ILSVRC/Data/CLS-LOC/train', 
                                     transform=self.transform_train())
         
         return DataLoader(train_dataset, 
@@ -39,7 +39,7 @@ class ImageNet():
                           num_workers=self.num_workers)
 
     def test_data(self):
-        test_dataset = ImageFolder(root='Imagenet/ILSVRC/Data/CLS-LOC/val', 
+        test_dataset = ImageFolder(root='/data/gpfs/datasets/Imagenet/ILSVRC/Data/CLS-LOC/val', 
                                    transform=self.transform_test())
         return DataLoader(test_dataset, 
                           batch_size=self.test_batch_size, 
@@ -48,7 +48,7 @@ class ImageNet():
     
 def main():
 
-    train_dataset = ImageFolder(root='Imagenet/ILSVRC/Data/CLS-LOC/train', 
+    train_dataset = ImageFolder(root='/data/gpfs/datasets/Imagenet/ILSVRC/Data/CLS-LOC/train', 
                                     transform=transforms.Compose([
                                         transforms.RandomResizedCrop(224),
                                         transforms.RandomHorizontalFlip(p=0.5),

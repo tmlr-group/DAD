@@ -185,7 +185,7 @@ def adaptive_pgd_eot_generate(denoiser, semantic_model, model, sigma, sigma0, ep
     model.eval()
     adv_dataset = AdvDataset()
 
-    if args.data == 'CIFAR10':
+    if args.data == 'CIFAR10' or args.data == 'SVHN':
         args.step_size = 2/255
         args.num_steps = 200
         args.epsilon = 8/255
@@ -243,7 +243,7 @@ def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigm
         noise = torch.clamp(noise, 0, 1)
         noisy_data = torch.clamp(data + noise, 0, 1)
 
-        if mmd_value <= 0.05:
+        if mmd_value <= args.threshold:
             logits_out = clf(data)
         else:
             X_puri = denoiser(noisy_data)
@@ -268,8 +268,7 @@ def main():
         args.num_class = 10
         train_loader = CIFAR10(train_batch_size=args.batch_size).train_data()
         train_dataset = train_loader.dataset
-        if args.generate:
-            test_loader = CIFAR10(test_batch_size=args.batch_size).test_data()
+        test_loader = CIFAR10(test_batch_size=args.batch_size).test_data()
 
         denoiser_dir = './checkpoint/CIFAR10/Denoise'
         input_size = [32, 32]
@@ -317,7 +316,7 @@ def main():
         print('load cls successfully!')
     if args.data == "ImageNet":
         args.num_class = 1000
-        train_dataset = ImageFolder(root='Imagenet/ILSVRC/Data/CLS-LOC/train', 
+        train_dataset = ImageFolder(root='/data/gpfs/datasets/Imagenet/ILSVRC/Data/CLS-LOC/train', 
                                     transform=transforms.Compose([
                                         transforms.RandomResizedCrop(224),
                                         transforms.RandomHorizontalFlip(p=0.5),
@@ -359,6 +358,51 @@ def main():
             print('load semantic model successfully!')
             loaded_parameters = torch.load('checkpoint/ImageNet/SAMMD/rn50_mmd_parameters.pth')
             PATH_DATA='./adv_data/ImageNet/RN50'
+    if args.data == "SVHN":
+        args.mmd_dir = './checkpoint/SVHN/SAMMD'
+        args.num_class = 10
+        train_loader = SVHN(train_batch_size=args.batch_size).train_data()
+        train_dataset = train_loader.dataset
+        test_loader = SVHN(test_batch_size=args.batch_size).test_data()
+
+        denoiser_dir = './checkpoint/SVHN/Denoise'
+        input_size = [32, 32]
+        block = Conv
+        fwd_out = [64, 128, 256, 256, 256]
+        num_fwd = [2, 3, 3, 3, 3]
+        back_out = [64, 128, 256, 256]
+        num_back = [2, 3, 3, 3]
+        denoiser = Denoise(input_size[0], input_size[1], block, 3, fwd_out, num_fwd, back_out, num_back).to(device)
+        denoiser = torch.nn.DataParallel(denoiser)
+
+        checkpoint = torch.load('checkpoint/SVHN/WRN28/wide-resnet-28x10.pth')
+        semantic_model = WRN28_10(semantic=True).to(device)
+        semantic_model.load_state_dict(checkpoint)
+        semantic_model = torch.nn.DataParallel(semantic_model)
+        semantic_model.eval()
+        print('load semantic model successfully!')
+
+         # create subsets
+        with open('data/svhn_mmd_indices.pkl', 'rb') as f:
+            mmd_indices = pickle.load(f)
+        print('load mmd indices successfully!')
+        args.mmd_batch = len(mmd_indices)
+        mmd_subset = Subset(train_dataset, mmd_indices)
+        print('load mmd dataset successfully!')
+        
+        data_only = [mmd_subset[i][0] for i in range(len(mmd_subset))]
+        nat_data = torch.stack(data_only)
+
+        if args.model == 'wrn28':
+            clf_checkpoint = torch.load('checkpoint/SVHN/WRN28/wide-resnet-28x10.pth')
+            clf = WRN28_10(semantic=False).to(device)
+            loaded_parameters = torch.load('{}/wrn28_mmd_parameters.pth'.format(args.mmd_dir))
+            denoiser_ckpt = torch.load('{}/SVHN_wrn28_denoiser_epoch60_{}.pth'.format(denoiser_dir, args.index))
+            PATH_DATA='./adv_data/SVHN/WRN28'
+        
+        clf.load_state_dict(clf_checkpoint)
+        clf = torch.nn.DataParallel(clf)
+        clf.eval()
         
     ep = loaded_parameters['ep']
     sigma0 = loaded_parameters['sigma0']
@@ -377,6 +421,8 @@ def main():
         adaptive_adv_dataset = adaptive_pgd_eot_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
         print('==> Save adversarial sample')
         torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.norm}_{args.model}_PGDEOT_adaptive.pth'))
+    print('current threshold is: ', args.threshold)
+    print('current model is: ', args.model)
 
     print('=====================Natural Accuracy===================')
     eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigma, sigma0, ep)
@@ -386,10 +432,22 @@ def main():
     l_inf_adaptive_test_loader = DataLoader(l_inf_adaptive_adv_dataset, batch_size=args.batch_size, shuffle=False)
     eval_test(denoiser, clf, device, l_inf_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 
-    print('=====================Adaptive PGDEOT L_2 Accuracy====================')
-    l_2_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_2_{args.model}_PGDEOT_adaptive.pth'))
-    l_2_adaptive_test_loader = DataLoader(l_2_adaptive_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
-    eval_test(denoiser, clf, device, l_2_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
+    # print('=====================Adaptive PGDEOT L_2 Accuracy====================')
+    # l_2_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_2_{args.model}_PGDEOT_adaptive.pth'))
+    # l_2_adaptive_test_loader = DataLoader(l_2_adaptive_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
+    # eval_test(denoiser, clf, device, l_2_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
+
+    # print('=====================Adaptive AutoAttack Accuracy====================')
+    # l_inf_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_True_aa_{args.epsilon}_{args.model}.pth'))
+    # l_inf_adaptive_test_loader = DataLoader(l_inf_adaptive_adv_dataset, batch_size=args.batch_size, shuffle=False)
+    # eval_test(denoiser, clf, device, l_inf_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
+
+    # print('=====================Adaptive AutoAttack L_2 Accuracy====================')
+    # l_2_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_True_aa_l2_{args.epsilon}_{args.model}.pth'))
+    # l_2_adaptive_test_loader = DataLoader(l_2_adaptive_adv_dataset, batch_size=args.mmd_batch, shuffle=False)
+    # eval_test(denoiser, clf, device, l_2_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
+
+    print("=================================================================")
 
 if __name__ == '__main__':
     main()

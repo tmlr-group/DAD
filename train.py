@@ -12,6 +12,7 @@ from torchvision.models import resnet50
 from models.denoise import Denoise, Conv
 from dataset.utils import *
 from torchvision.datasets import CIFAR10 as DATA
+from torchvision.datasets import SVHN
 import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Subset
@@ -41,7 +42,7 @@ parser.add_argument('--adv-dir', default='./adv_data/CIFAR10/WRN28/', help='dire
 parser.add_argument('--save-freq', '-s', default=10, type=int, help='save frequency')
 parser.add_argument('--test-freq', default=1, type=int, help='test frequency')
 parser.add_argument('--num-workers', type=int, default=2, help='number of workers')
-parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet'])
+parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet', 'SVHN'])
 parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'wrn70', 'rn50', 'rn18'])
 parser.add_argument("--n-epochs", type=int, default=200, help="number of epochs for mmd training")
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
@@ -309,6 +310,55 @@ def main():
             print('load semantic model successfully!')
         else:
             raise ValueError("Unknown model")
+    elif args.data == 'SVHN':
+        args.mmd_dir = './checkpoint/SVHN/SAMMD'
+        train_dataset = SVHN('./data/', split='train', download=True, 
+                             transform=transforms.Compose([
+                                 transforms.RandomHorizontalFlip(),
+                                 transforms.ToTensor(),
+                                 ]))
+        with open('data/svhn_mmd_indices.pkl', 'rb') as f:
+            mmd_indices = pickle.load(f)
+        print('load mmd indices successfully!')
+        args.mmd_batch = len(mmd_indices)
+        mmd_subset = Subset(train_dataset, mmd_indices)
+        mmd_loader = DataLoader(mmd_subset, 
+                          batch_size=args.mmd_batch, 
+                          shuffle=False, 
+                          num_workers=args.num_workers)
+        print('load mmd dataset successfully!')
+        with open('data/svhn_train_indices.pkl', 'rb') as f:
+            train_indices = pickle.load(f)
+        train_subset = Subset(train_dataset, train_indices)
+        train_loader = DataLoader(train_subset, 
+                          batch_size=args.batch_size, 
+                          shuffle=False, 
+                          num_workers=args.num_workers)
+        print('load train dataset successfully!')
+
+        denoiser_dir = './checkpoint/SVHN/Denoise'
+        input_size = [32, 32]
+        block = Conv
+        fwd_out = [64, 128, 256, 256, 256]
+        num_fwd = [2, 3, 3, 3, 3]
+        back_out = [64, 128, 256, 256]
+        num_back = [2, 3, 3, 3]
+        denoiser = Denoise(input_size[0], input_size[1], block, 3, fwd_out, num_fwd, back_out, num_back).to(device)
+        denoiser = torch.nn.DataParallel(denoiser)
+
+        if args.model == 'wrn28':
+            semantic_model = WRN28_10(semantic=True).to(device)
+            semantic_checkpoint = torch.load('checkpoint/SVHN/WRN28/wide-resnet-28x10.pth')
+            semantic_model.load_state_dict(semantic_checkpoint)
+            semantic_model = torch.nn.DataParallel(semantic_model)
+            semantic_model.eval()
+            print('load semantic model successfully!')
+            clf = WRN28_10(semantic=False).to(device)
+            checkpoint = torch.load('checkpoint/SVHN/WRN28/wide-resnet-28x10.pth') # download targeted model 
+            clf.load_state_dict(checkpoint)
+            clf = torch.nn.DataParallel(clf)
+            clf.eval()
+            print('load cls successfully!')
     else:
         raise ValueError("Unknown data")
 
@@ -325,7 +375,7 @@ def main():
     nat_data = nat_data[0:args.batch_size]
     print('the length of nat data is: ', len(nat_data))
     
-    if args.data == 'CIFAR10':
+    if args.data == 'CIFAR10' or args.data == 'SVHN':
         # generating adversarial examples for training
         start_time = time.time()
         print('generating adversarial examples for training')
@@ -391,6 +441,10 @@ def main():
             if args.data == 'ImageNet':
                 torch.save(denoiser.state_dict(),
                 os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, args.index)))
+                print('save the denoiser')
+            if args.data == 'SVHN':
+                torch.save(denoiser.state_dict(),
+                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, args.index)))
                 print('save the denoiser')
         print('================================================================')
 
