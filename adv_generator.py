@@ -40,6 +40,8 @@ parser.add_argument('--white-box', action='store_true', default=False, help='whi
 parser.add_argument('--generate', action='store_true', default=False, help='generate adv or not')
 parser.add_argument('--norm', type=str, default='l_inf', help='l_norm', choices=['l_inf', 'l_2'])
 parser.add_argument('--threshold', type=float, default=0.05, help='threshold for detecting AEs')
+parser.add_argument('--fpr', type=float, default=0.05, help='fpr for detecting AEs')
+parser.add_argument('--type', type=str, default='vanilla', choices=['vanilla', 'trades', 'mart', 'awp'])
 args = parser.parse_args()
 
 class Adaptive_Whitebox_Model(nn.Module):

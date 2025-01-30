@@ -184,7 +184,7 @@ def craft_adversarial_example(model,
                               epsilon=8/255, 
                               perturb_steps=10,
                               num_classes=10,
-                              mode='pgd'):
+                              mode='eotpgd'):
     if mode == 'pgd':
         attack = PGD(model, 
                      eps=epsilon, 

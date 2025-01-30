@@ -49,6 +49,8 @@ parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for m
 parser.add_argument('--mode', type=str, default='train', help='decide to train a denoiser or test the denoiser')
 parser.add_argument('--attack', type=str, default='mma', help='select attack setting')
 parser.add_argument('--index', type=int, default=1, help='index of the model')
+parser.add_argument('--fpr', type=float, default=0.05, help='fpr for detecting AEs')
+parser.add_argument('--type', type=str, default='vanilla', choices=['vanilla', 'trades', 'mart', 'awp'])
 args = parser.parse_args()
 
 def train_mmd(args, train_loader, ae_train_loader, semantic_model, device):
