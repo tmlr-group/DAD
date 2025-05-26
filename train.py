@@ -26,6 +26,7 @@ parser.add_argument('--batch-size', type=int, default=100, help='input batch siz
 parser.add_argument('--epochs', type=int, default=60, help='number of epochs to train')
 parser.add_argument('--weight-decay', default=2e-4, type=float, metavar='W', help='weight decay (default: 2e-4)')
 parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+parser.add_argument("--alpha", type=float, default=1e-2, help="regularization term")
 parser.add_argument('--momentum', type=float, default=0.9, help='SGD momentum')
 parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
@@ -139,7 +140,8 @@ def train_denoiser(args, train_loader, ae_train_loader, optimizer, epoch, denois
                                    sigma, sigma0, ep, 0.05, device, torch.float)
         logits_out = clf(X_puri)
         loss = F.cross_entropy(logits_out, label)
-        total_loss = loss + 100*mmd_value
+        #total_loss = loss + 100*mmd_value
+        total_loss = mmd_value + args.alpha * loss
         total_loss.backward()
         optimizer.step()
 
@@ -438,7 +440,7 @@ def main():
         if epoch % args.save_freq == 0:
             if args.data == 'CIFAR10':
                 torch.save(denoiser.state_dict(),
-                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_{}.pth'.format(args.data, args.model, epoch, args.index)))
+                    os.path.join(denoiser_dir, '{}_{}_denoiser_epoch{}_alpha{}_{}.pth'.format(args.data, args.model, epoch, args.alpha, args.index)))
                 print('save the denoiser')
             if args.data == 'ImageNet':
                 torch.save(denoiser.state_dict(),

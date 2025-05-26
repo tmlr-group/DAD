@@ -72,7 +72,7 @@ def adaptive_pgd_eot_l_inf(device,
             # Calculate loss
             cost = loss(outputs, labels)
             
-            total_cost = cost + 100*mmd_value
+            total_cost = mmd_value + args.alpha*cost
 
             # Update adversarial images
             grad += torch.autograd.grad(
@@ -302,7 +302,7 @@ def main():
             clf_checkpoint = torch.load('checkpoint/CIFAR10/WRN28/wide-resnet-28x10.pth')
             clf = WRN28_10(semantic=False).to(device)
             loaded_parameters = torch.load('{}/wrn28_mmd_parameters.pth'.format(args.mmd_dir))
-            denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60_{}.pth'.format(denoiser_dir, args.index))
+            denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60_alpha{}_{}.pth'.format(denoiser_dir, args.alpha, args.index))
             PATH_DATA='./adv_data/CIFAR10/WRN28'
         elif args.model == 'wrn70':
             clf_checkpoint = torch.load('checkpoint/CIFAR10/WRN70/wide-resnet-70x16.pth')
@@ -420,15 +420,13 @@ def main():
         print('==> Generate adversarial sample')
         adaptive_adv_dataset = adaptive_pgd_eot_generate(denoiser, semantic_model, clf, sigma, sigma0, ep, test_loader, device)
         print('==> Save adversarial sample')
-        torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.norm}_{args.model}_PGDEOT_adaptive.pth'))
-    print('current threshold is: ', args.threshold)
-    print('current model is: ', args.model)
+        torch.save(adaptive_adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.norm}_{args.model}_PGDEOT_adaptive_alpha{args.alpha}.pth'))
 
     print('=====================Natural Accuracy===================')
     eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 
     print('=====================Adaptive PGDEOT L_inf Accuracy====================')
-    l_inf_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_inf_{args.model}_PGDEOT_adaptive.pth'))
+    l_inf_adaptive_adv_dataset = torch.load(os.path.join(PATH_DATA, f'{args.mode}_l_inf_{args.model}_PGDEOT_adaptive_alpha{args.alpha}.pth'))
     l_inf_adaptive_test_loader = DataLoader(l_inf_adaptive_adv_dataset, batch_size=args.batch_size, shuffle=False)
     eval_test(denoiser, clf, device, l_inf_adaptive_test_loader, nat_data, semantic_model, sigma, sigma0, ep)
 

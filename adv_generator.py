@@ -24,6 +24,7 @@ parser.add_argument('--mmd-dir', default='./checkpoint/CIFAR10/SAMMD',
                     help='directory of mmd for saving checkpoint')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
+parser.add_argument("--alpha", type=float, default=1e-2, help="regularization term")
 parser.add_argument('--model', type=str, default='wrn28', choices=['rn18', 'wrn28', 'wrn70', 'rn50', 'swin'])
 parser.add_argument("--mmd-batch", type=int, default=100, help="batch size for mmd training")
 parser.add_argument('--batch-size', type=int, default=100, metavar='N',
@@ -101,7 +102,7 @@ class Adaptive_Whitebox_Model(nn.Module):
             num_back = [2, 3, 3, 3]
             denoiser = Denoise(input_size[0], input_size[1], block, 3, fwd_out, num_fwd, back_out, num_back).to(device)
             denoiser = torch.nn.DataParallel(denoiser)
-            denoiser_ckpt = torch.load('{}/{}_{}_denoiser_epoch60_{}.pth'.format(denoiser_dir, args.data, args.model, index))
+            denoiser_ckpt = torch.load('{}/{}_{}_denoiser_epoch60_alpha{}_{}.pth'.format(denoiser_dir, args.data, args.model, args.alpha, index))
             denoiser.load_state_dict(denoiser_ckpt)
         if args.data == 'ImageNet':
             denoiser_dir = './checkpoint/ImageNet/Denoise'
@@ -229,7 +230,7 @@ def main():
 
     if args.mode == 'test':
         adv_dataset = adv_generate(model, test_loader, device, args)
-        torch.save(adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.white_box}_{args.attack}_{args.epsilon}_{args.model}_{args.index}.pth'))
+        torch.save(adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.white_box}_{args.attack}_{args.epsilon}_{args.model}_{args.alpha}_{args.index}.pth'))
     if args.mode == 'train':
         adv_dataset = adv_generate(model, train_loader, device, args)
         torch.save(adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.attack}_{args.epsilon}_{args.model}.pth'))
