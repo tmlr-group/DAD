@@ -28,7 +28,10 @@ parser.add_argument('--batch-size', type=int, default=100, metavar='N',
 parser.add_argument('--attack',type=str,default='adaptive_pgd',help='select attack setting')
 parser.add_argument('--mode', type=str, default='test', help='decide to generate test data or train data')
 parser.add_argument('--epsilon', default=12/255, type=parse_fraction, help='perturbation')
+parser.add_argument('--threshold', default=0.02, type=float, help='threshold for mmd')
 parser.add_argument('--num-steps', default=10, type=int, help='perturb number of steps')
+parser.add_argument('--index', type=int, default=1, help='index of the model')
+parser.add_argument('--white-box', action='store_true', default=False, help='white-box attack or non-white-box attack')
 args = parser.parse_args()
 
 def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigma, sigma0, ep):
@@ -57,7 +60,7 @@ def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigm
         S = torch.cat([nat_data.cpu(), data.cpu()], 0).cuda()
         S_FEA = S.view(nat_data.shape[0] + test_feature.shape[0], -1)
 
-        h1, _, _= SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
+        _, _, mmd_value= SAMMD_WB(Sv, 100, nat_feature.shape[0], S_FEA, 
                                    sigma, sigma0, ep, 0.05, device, torch.float)
 
         #add Gaussian noise
@@ -66,7 +69,7 @@ def eval_test(denoiser, clf, device, test_loader, nat_data, semantic_model, sigm
         noise = torch.clamp(noise, 0, 1)
         noisy_data = torch.clamp(data + noise, 0, 1)
 
-        if h1 == 0:
+        if mmd_value < args.threshold:
             logits_out = clf(data)
         else:
             X_puri = denoiser(noisy_data)
@@ -105,10 +108,10 @@ def main():
     elif args.epsilon == 12/255:
         cw_epsilon = 1.0
 
-    eotpgd_testset = torch.load('{}/test_eotpgd_{}_{}.pth'.format(adv_dir, args.epsilon, args.model))
+    eotpgd_testset = torch.load('{}/test_{}_eotpgd_{}_{}_{}.pth'.format(adv_dir, args.white_box, args.epsilon, args.model, args.index))
     eotpgd_test_loader = DataLoader(eotpgd_testset, batch_size=args.batch_size, shuffle=False)
 
-    cw_testset = torch.load('{}/test_cw_{}_{}.pth'.format(adv_dir, cw_epsilon, args.model))
+    cw_testset = torch.load('{}/test_{}_cw_{}_{}_{}.pth'.format(adv_dir, args.white_box, cw_epsilon, args.model, args.index))
     cw_test_loader = DataLoader(cw_testset, batch_size=args.batch_size, shuffle=False)
 
     denoiser_dir = './checkpoint/CIFAR10/Denoise'
@@ -149,7 +152,7 @@ def main():
 
     cudnn.benchmark = True
 
-    denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60.pth'.format(denoiser_dir))
+    denoiser_ckpt = torch.load('{}/CIFAR10_wrn28_denoiser_epoch60_{}.pth'.format(denoiser_dir, args.index))
     denoiser.load_state_dict(denoiser_ckpt)
 
     loaded_parameters = torch.load('{}/wrn28_mmd_parameters.pth'.format(args.mmd_dir))

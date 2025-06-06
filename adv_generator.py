@@ -230,7 +230,7 @@ def main():
 
     if args.mode == 'test':
         adv_dataset = adv_generate(model, test_loader, device, args)
-        torch.save(adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.white_box}_{args.attack}_{args.epsilon}_{args.model}_{args.alpha}_{args.index}.pth'))
+        torch.save(adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.white_box}_{args.attack}_{args.epsilon}_{args.model}_{args.index}.pth'))
     if args.mode == 'train':
         adv_dataset = adv_generate(model, train_loader, device, args)
         torch.save(adv_dataset, os.path.join(PATH_DATA, f'{args.mode}_{args.attack}_{args.epsilon}_{args.model}.pth'))
