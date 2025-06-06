@@ -18,7 +18,7 @@ parser.add_argument('--model', type=str, default='wrn28', choices=['wrn28', 'wrn
 parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                     help='input batch size for training (default: 128)')
 parser.add_argument('--epsilon', default=8/255, type=parse_fraction, help='perturbation')
-parser.add_argument('--threshold', default=0.05, type=float, help='threshold for mmd')
+parser.add_argument('--threshold', default=0.5, type=float, help='threshold for mmd')
 parser.add_argument('--data', type=str, default='CIFAR10', help='data source', choices=['CIFAR10', 'ImageNet'])
 parser.add_argument('--index', type=int, default=1, help='index of the model')
 parser.add_argument('--white-box', action='store_true', default=False, help='white-box attack or non-white-box attack')

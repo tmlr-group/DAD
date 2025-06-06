@@ -64,7 +64,7 @@ def adaptive_pgd_eot_l_inf(device,
                 noise = torch.clamp(noise, 0, 1)
                 noisy_data = torch.clamp(adv_images + noise, 0, 1)
 
-            if mmd_value <= 0.05:
+            if mmd_value <= args.threshold:
                 outputs = clf(adv_images)
             else:
                 outputs = clf(denoiser(noisy_data))
@@ -148,7 +148,7 @@ def adaptive_pgd_eot_l2(device,
                 noise = torch.clamp(noise, 0, 1)
                 noisy_data = torch.clamp(adv_images + noise, 0, 1)
 
-            if mmd_value <= 0.05:
+            if mmd_value <= args.threshold:
                 outputs = clf(adv_images)
             else:
                 outputs = clf(denoiser(noisy_data))
